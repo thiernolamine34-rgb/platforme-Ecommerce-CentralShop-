@@ -17,15 +17,15 @@
 
 | Page de connexion | Catalogue produits |
 |:-:|:-:|
-| ("<img width="1919" height="908" alt="Capture d&#39;écran 2026-04-29 230417" src="https://github.com/user-attachments/assets/cbf66669-3451-45e8-ae15-a9d1a164e4f2" />
-") |("<img width="1919" height="908" alt="Capture d&#39;écran 2026-04-29 230417" src="https://github.com/user-attachments/assets/ee4defc8-01cb-48bc-bea6-c9e596d921df" />)
+| <img width="1919" height="908" alt="Capture d&#39;écran 2026-04-29 230417" src="https://github.com/user-attachments/assets/cbf66669-3451-45e8-ae15-a9d1a164e4f2" />
+|<img width="1919" height="908" alt="Capture d&#39;écran 2026-04-29 230417" src="https://github.com/user-attachments/assets/ee4defc8-01cb-48bc-bea6-c9e596d921df" />
  |
 
 | Panier enrichi | Espace vendeur |
 |:-:|:-:|
-| ("<img width="1919" height="909" alt="Capture d&#39;écran 2026-04-29 230300" src="https://github.com/user-attachments/assets/52b1a6fe-83be-4442-a291-628b672f5424" />
-) |(<img width="1919" height="905" alt="Capture d&#39;écran 2026-04-29 230314" src="https://github.com/user-attachments/assets/ce884e61-68cf-486e-8158-645f8e889920" />
-) |
+|<img width="1919" height="909" alt="Capture d&#39;écran 2026-04-29 230300" src="https://github.com/user-attachments/assets/52b1a6fe-83be-4442-a291-628b672f5424" />
+|<img width="1919" height="905" alt="Capture d&#39;écran 2026-04-29 230314" src="https://github.com/user-attachments/assets/ce884e61-68cf-486e-8158-645f8e889920" />
+ |
 
 ---
 
