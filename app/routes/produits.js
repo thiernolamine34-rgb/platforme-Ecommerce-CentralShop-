@@ -1,14 +1,16 @@
-const express        = require('express');
-const router         = express.Router();
-const redis          = require('../services/redis');
-const multer         = require('multer');
-const path           = require('path');
-const fs             = require('fs');
-const { Produit }    = require('../services/mongodb');
-const authMiddleware = require('../middleware/authMiddleware');
+const express           = require('express');
+const router            = express.Router();
+const redis             = require('../services/redis');
+const multer            = require('multer');
+const path              = require('path');
+const fs                = require('fs');
+const { Produit }       = require('../services/mongodb');
+const authMiddleware    = require('../middleware/authMiddleware');
+const vendeurMiddleware = require('../middleware/vendeurMiddleware');
 
 const CACHE_TTL = 60;
 
+// ─── Multer ────────────────────────────────────────────────────
 const uploadDir = '/app/uploads';
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
@@ -36,7 +38,9 @@ async function invaliderCacheListe() {
   if (keys.length) await redis.del(...keys);
 }
 
+// ─────────────────────────────────────────────────────────────
 // GET /produits — Liste paginée avec filtres (PUBLIC)
+// ─────────────────────────────────────────────────────────────
 router.get('/', async (req, res) => {
   try {
     const { categorie, search, vendeur, page = 1, limit = 20 } = req.query;
@@ -68,13 +72,14 @@ router.get('/', async (req, res) => {
     }
 
     res.json({ source: '🗄 MongoDB', ...result });
-
   } catch (err) {
     res.status(500).json({ erreur: err.message });
   }
 });
 
-// GET /produits/categories — Liste des catégories (PUBLIC)
+// ─────────────────────────────────────────────────────────────
+// GET /produits/categories (PUBLIC)
+// ─────────────────────────────────────────────────────────────
 router.get('/categories', async (req, res) => {
   try {
     const cached = await redis.get('produits:categories');
@@ -87,33 +92,33 @@ router.get('/categories', async (req, res) => {
   }
 });
 
-// GET /produits/:id/similaires — Produits similaires (PUBLIC)
+// ─────────────────────────────────────────────────────────────
+// GET /produits/:id/similaires (PUBLIC)
+// ─────────────────────────────────────────────────────────────
 router.get('/:id/similaires', async (req, res) => {
   try {
     const produit = await Produit.findById(req.params.id);
     if (!produit) return res.status(404).json({ erreur: 'Produit introuvable' });
-
     const similaires = await Produit.find({
       categorie: produit.categorie,
       _id:       { $ne: produit._id }
     }).limit(6).sort({ vues: -1 });
-
     res.json({ similaires });
   } catch (err) {
     res.status(500).json({ erreur: err.message });
   }
 });
 
+// ─────────────────────────────────────────────────────────────
 // GET /produits/:id (PUBLIC)
+// ─────────────────────────────────────────────────────────────
 router.get('/:id', async (req, res) => {
   try {
-    const { id } = req.params;
-    const cached = await redis.get(`produits:${id}`);
+    const { id }   = req.params;
+    const cached   = await redis.get(`produits:${id}`);
     if (cached) return res.json({ source: '⚡ CACHE Redis', produit: JSON.parse(cached) });
-
     const produit = await Produit.findById(id);
     if (!produit) return res.status(404).json({ erreur: 'Produit introuvable' });
-
     await redis.setex(`produits:${id}`, CACHE_TTL, JSON.stringify(produit));
     res.json({ source: '🗄 MongoDB', produit });
   } catch (err) {
@@ -121,8 +126,10 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// POST /produits (AUTHENTIFIÉ)
-router.post('/', authMiddleware, upload.single('image'), async (req, res) => {
+// ─────────────────────────────────────────────────────────────
+// POST /produits — Créer (AUTHENTIFIÉ + VENDEUR)
+// ─────────────────────────────────────────────────────────────
+router.post('/', authMiddleware, vendeurMiddleware, upload.single('image'), async (req, res) => {
   try {
     const { nom, prix, categorie, stock, description } = req.body;
     if (!nom || !prix || !categorie)
@@ -133,7 +140,7 @@ router.post('/', authMiddleware, upload.single('image'), async (req, res) => {
       stock:       parseInt(stock) || 0,
       description: description || '',
       image:       req.file ? `/uploads/${req.file.filename}` : '',
-      vendeur:     req.user.username
+      vendeur:     req.user.username  // Toujours le username du créateur
     });
 
     await produit.save();
@@ -146,12 +153,21 @@ router.post('/', authMiddleware, upload.single('image'), async (req, res) => {
   }
 });
 
-// PUT /produits/:id (AUTHENTIFIÉ)
-router.put('/:id', authMiddleware, upload.single('image'), async (req, res) => {
+// ─────────────────────────────────────────────────────────────
+// PUT /produits/:id — Modifier (AUTHENTIFIÉ + VENDEUR + PROPRIÉTAIRE)
+// ─────────────────────────────────────────────────────────────
+router.put('/:id', authMiddleware, vendeurMiddleware, upload.single('image'), async (req, res) => {
   try {
     const { id } = req.params;
-    const { nom, prix, categorie, stock, description } = req.body;
+    const produit = await Produit.findById(id);
+    if (!produit) return res.status(404).json({ erreur: 'Produit introuvable' });
 
+    // Vérification propriété : seul le créateur ou un admin peut modifier
+    if (req.user.role !== 'admin' && produit.vendeur !== req.user.username) {
+      return res.status(403).json({ erreur: 'Vous ne pouvez modifier que vos propres produits' });
+    }
+
+    const { nom, prix, categorie, stock, description } = req.body;
     const update = {};
     if (nom         !== undefined) update.nom         = nom;
     if (prix        !== undefined) update.prix        = parseFloat(prix);
@@ -160,26 +176,41 @@ router.put('/:id', authMiddleware, upload.single('image'), async (req, res) => {
     if (description !== undefined) update.description = description;
     if (req.file)                  update.image       = `/uploads/${req.file.filename}`;
 
-    const produit = await Produit.findByIdAndUpdate(id, update, { new: true, runValidators: true });
-    if (!produit) return res.status(404).json({ erreur: 'Produit introuvable' });
+    const produitMaj = await Produit.findByIdAndUpdate(id, update, { new: true, runValidators: true });
 
     await redis.del(`produits:${id}`);
     await invaliderCacheListe();
     await redis.del('produits:categories');
 
-    res.json({ message: 'Produit modifié', produit });
+    res.json({ message: 'Produit modifié', produit: produitMaj });
   } catch (err) {
     res.status(500).json({ erreur: err.message });
   }
 });
 
-// DELETE /produits/:id (AUTHENTIFIÉ)
-router.delete('/:id', authMiddleware, async (req, res) => {
+// ─────────────────────────────────────────────────────────────
+// DELETE /produits/:id — Supprimer (AUTHENTIFIÉ + VENDEUR + PROPRIÉTAIRE)
+//
+// Règle métier :
+//   - Un vendeur peut supprimer UNIQUEMENT ses propres produits
+//   - Un admin peut supprimer N'IMPORTE QUEL produit
+// ─────────────────────────────────────────────────────────────
+router.delete('/:id', authMiddleware, vendeurMiddleware, async (req, res) => {
   try {
     const { id }  = req.params;
     const produit = await Produit.findById(id);
+    if (!produit) return res.status(404).json({ erreur: 'Produit introuvable' });
 
-    if (produit?.image) {
+    // Vérification propriété
+    if (req.user.role !== 'admin' && produit.vendeur !== req.user.username) {
+      return res.status(403).json({
+        erreur:  'Vous ne pouvez supprimer que vos propres produits',
+        detail:  `Ce produit appartient au vendeur "${produit.vendeur}"`
+      });
+    }
+
+    // Supprimer le fichier image du disque si existant
+    if (produit.image) {
       const filePath = `/app${produit.image}`;
       if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
     }

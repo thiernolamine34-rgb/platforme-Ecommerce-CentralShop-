@@ -21,7 +21,7 @@ export default function Login({ onLogin }) {
     setErreur('');
     try {
       const res = await api.post('/api/auth/login/', form);
-      onLogin(res.data.sessionId, res.data.username);
+      onLogin(res.data.sessionId, res.data.username, res.data.role || 'user');
     } catch (err) {
       setErreur(err.response?.data?.erreur || 'Identifiants invalides');
     } finally {

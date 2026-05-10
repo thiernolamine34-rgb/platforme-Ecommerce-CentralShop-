@@ -8,7 +8,7 @@ const C = {
   border: '#e5e7eb', white: '#ffffff', success: '#16a34a', red: '#dc2626'
 };
 
-export default function Produits({ session }) {
+export default function Produits({ session, role, username }) {
   const [searchParams]          = useSearchParams();
   const navigate                = useNavigate();
   const [produits, setProduits] = useState([]);
@@ -118,13 +118,16 @@ export default function Produits({ session }) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
           <div>
             <h2 style={{ fontSize: '20px', fontWeight: '700', color: C.dark, margin: '0 0 4px' }}>{titre}</h2>
-            <span style={{ fontSize: '13px', color: C.gray }}>{produits.length} produit{produits.length > 1 ? 's' : ''}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style={{ fontSize: '13px', color: C.gray }}>{produits.length} produit{produits.length > 1 ? 's' : ''}</span>
+
+            </div>
           </div>
           <div style={{ display: 'flex', gap: '10px' }}>
             <button onClick={chargerProduits} style={{ padding: '9px 16px', background: C.white, color: C.gray, border: `1px solid ${C.border}`, borderRadius: '7px', cursor: 'pointer', fontSize: '13px' }}>
               Actualiser
             </button>
-            {session && (
+            {session && (role === 'vendeur' || role === 'admin') && (
               <button onClick={() => setShowForm(!showForm)} style={{ padding: '9px 18px', background: C.orange, color: C.white, border: 'none', borderRadius: '7px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>
                 {showForm ? 'Fermer' : '+ Ajouter un produit'}
               </button>
@@ -139,7 +142,7 @@ export default function Produits({ session }) {
         )}
 
         {/* Formulaire ajout */}
-        {showForm && session && (
+        {showForm && session && (role === 'vendeur' || role === 'admin') && (
           <div style={{ background: C.white, borderRadius: '12px', padding: '24px', marginBottom: '24px', border: `1px solid ${C.border}` }}>
             <h3 style={{ margin: '0 0 20px', fontSize: '16px', fontWeight: '600', color: C.dark }}>Nouveau produit</h3>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
@@ -195,6 +198,7 @@ export default function Produits({ session }) {
                 onMouseEnter={e => e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.1)'}
                 onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}>
 
+                {/* Image cliquable → détail */}
                 <Link to={`/produits/${p._id}`} style={{ display: 'block', height: '200px', background: C.lightGray, overflow: 'hidden', position: 'relative', borderBottom: `1px solid ${C.border}` }}>
                   {p.image
                     ? <img src={p.image} alt={p.nom} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -233,6 +237,7 @@ export default function Produits({ session }) {
                     <span>🛒 {p.commandes || 0} vendus</span>
                   </div>
 
+                  {/* CTA orange */}
                   <button onClick={() => ajouterAuPanier(p)} disabled={p.stock === 0}
                     style={{
                       width: '100%', padding: '10px', border: 'none', borderRadius: '7px', cursor: p.stock > 0 ? 'pointer' : 'not-allowed',
@@ -247,7 +252,7 @@ export default function Produits({ session }) {
                     {p.stock > 0 ? (session ? 'Ajouter au panier' : 'Se connecter pour acheter') : 'Indisponible'}
                   </button>
 
-                  {session && (
+                  {session && (role === 'admin' || (role === 'vendeur' && p.vendeur === username)) && (
                     <button onClick={() => supprimerProduit(p._id, p.nom)}
                       style={{ width: '100%', padding: '6px', background: C.white, color: C.red, border: `1px solid #fecaca`, borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>
                       Supprimer
